@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trading Journal</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #1a1a24;
+    --border: #2a2a3a;
+    --accent: #00e5a0;
+    --accent2: #7b61ff;
+    --red: #ff4d6a;
+    --green: #00e5a0;
+    --yellow: #ffd166;
+    --text: #e8e8f0;
+    --text2: #8888a8;
+    --text3: #555570;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  .header {
+    padding: 24px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--surface);
+  }
+
+  .header-left h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: 18px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .header-left p { font-size: 12px; color: var(--text3); margin-top: 2px; font-family: 'Space Mono', monospace; }
+
+  .header-right { display: flex; align-items: center; gap: 24px; }
+
+  .header-stats { display: flex; gap: 32px; }
+
+  .stat-item { text-align: right; }
+
+  .stat-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; font-family: 'Space Mono', monospace; }
+
+  .stat-value { font-size: 20px; font-weight: 600; font-family: 'Space Mono', monospace; margin-top: 2px; }
+  .stat-value.positive { color: var(--green); }
+  .stat-value.negative { color: var(--red); }
+  .stat-value.neutral { color: var(--text); }
+
+  .sync-status {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'Space Mono', monospace; font-size: 11px; color: var(--text3);
+    padding: 8px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+  }
+
+  .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); transition: all 0.3s; }
+  .sync-dot.synced { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .sync-dot.syncing { background: var(--yellow); animation: pulse 1s infinite; }
+  .sync-dot.error { background: var(--red); }
+
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .main { display: grid; grid-template-columns: 1fr 420px; height: calc(100vh - 81px); }
+
+  .calendar-section { padding: 32px; overflow-y: auto; border-right: 1px solid var(--border); }
+
+  .month-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 24px; }
+
+  .summary-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+
+  .summary-card-label { font-size: 10px; color: var(--text3); font-family: 'Space Mono', monospace; text-transform: uppercase; letter-spacing: 1px; }
+
+  .summary-card-value { font-family: 'Space Mono', monospace; font-size: 16px; font-weight: 700; margin-top: 4px; }
+
+  .calendar-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+
+  .calendar-nav h2 { font-family: 'Space Mono', monospace; font-size: 16px; color: var(--text); letter-spacing: 1px; }
+
+  .nav-btn {
+    background: var(--surface2); border: 1px solid var(--border); color: var(--text2);
+    width: 36px; height: 36px; border-radius: 8px; cursor: pointer; font-size: 16px;
+    transition: all 0.2s; display: flex; align-items: center; justify-content: center;
+  }
+  .nav-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; }
+
+  .day-header { text-align: center; font-size: 11px; font-family: 'Space Mono', monospace; color: var(--text3); padding: 8px 0; text-transform: uppercase; letter-spacing: 1px; }
+
+  .day-cell {
+    aspect-ratio: 1; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; cursor: pointer; transition: all 0.2s; display: flex;
+    flex-direction: column; padding: 8px; position: relative; overflow: hidden; min-height: 80px;
+  }
+  .day-cell:hover { border-color: var(--accent2); transform: translateY(-1px); }
+  .day-cell.empty { background: transparent; border-color: transparent; cursor: default; pointer-events: none; }
+  .day-cell.today { border-color: var(--accent); }
+  .day-cell.selected { border-color: var(--accent2); background: rgba(123, 97, 255, 0.1); }
+  .day-cell.has-trade.win { border-left: 3px solid var(--green); }
+  .day-cell.has-trade.loss { border-left: 3px solid var(--red); }
+  .day-cell.has-trade.breakeven { border-left: 3px solid var(--yellow); }
+
+  .day-number { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--text2); font-weight: 700; }
+  .day-cell.today .day-number { color: var(--accent); }
+  .day-pnl { font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; margin-top: auto; }
+  .day-pnl.positive { color: var(--green); }
+  .day-pnl.negative { color: var(--red); }
+  .day-trades { font-size: 10px; color: var(--text3); margin-top: 2px; }
+  .day-compliance { position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; border-radius: 50%; }
+  .compliance-full { background: var(--green); }
+  .compliance-partial { background: var(--yellow); }
+  .compliance-poor { background: var(--red); }
+
+  .panel-section { background: var(--surface); display: flex; flex-direction: column; overflow: hidden; }
+
+  .panel-header { padding: 24px 24px 16px; border-bottom: 1px solid var(--border); }
+
+  .panel-date { font-family: 'Space Mono', monospace; font-size: 13px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px; }
+
+  .panel-subtitle { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+  .panel-body { flex: 1; overflow-y: auto; padding: 20px 24px; }
+
+  .form-section { margin-bottom: 24px; }
+
+  .form-section-title { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--accent2); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+  .form-row.single { grid-template-columns: 1fr; }
+  .form-row.triple { grid-template-columns: 1fr 1fr 1fr; }
+
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+
+  .form-label { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; font-family: 'Space Mono', monospace; }
+
+  .form-input, .form-select, .form-textarea {
+    background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 13px;
+    padding: 8px 10px; transition: border-color 0.2s; outline: none; width: 100%;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { border-color: var(--accent2); }
+  .form-select option { background: var(--surface2); }
+  .form-textarea { resize: vertical; min-height: 70px; line-height: 1.5; }
+
+  .checklist { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .check-item {
+    display: flex; align-items: center; gap: 8px; cursor: pointer;
+    padding: 6px 10px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; transition: all 0.2s; user-select: none;
+  }
+  .check-item:hover { border-color: var(--accent2); }
+  .check-item.checked { border-color: var(--accent); background: rgba(0, 229, 160, 0.05); }
+
+  .check-box {
+    width: 14px; height: 14px; border: 1px solid var(--border); border-radius: 3px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 10px; transition: all 0.2s;
+  }
+  .check-item.checked .check-box { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .check-label { font-size: 11px; color: var(--text2); }
+  .check-item.checked .check-label { color: var(--text); }
+
+  .compliance-bar { margin-top: 12px; background: var(--surface2); border-radius: 6px; height: 6px; overflow: hidden; }
+  .compliance-fill { height: 100%; background: linear-gradient(90deg, var(--accent2), var(--accent)); border-radius: 6px; transition: width 0.5s ease; }
+
+  .compliance-text { display: flex; justify-content: space-between; margin-top: 6px; }
+  .compliance-text span { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--text3); }
+  .compliance-text .score { color: var(--accent); font-weight: 700; }
+
+  .rating-group { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+
+  .rating-btn {
+    width: 32px; height: 32px; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text3); font-family: 'Space Mono', monospace;
+    font-size: 12px; cursor: pointer; transition: all 0.2s;
+  }
+  .rating-btn:hover, .rating-btn.active { background: var(--accent2); border-color: var(--accent2); color: white; }
+
+  .save-btn {
+    width: 100%; padding: 14px; background: linear-gradient(135deg, var(--accent2), var(--accent));
+    border: none; border-radius: 10px; color: var(--bg); font-family: 'Space Mono', monospace;
+    font-size: 13px; font-weight: 700; letter-spacing: 1px; cursor: pointer;
+    transition: all 0.2s; text-transform: uppercase; margin-top: 8px;
+  }
+  .save-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+  .save-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 12px; color: var(--text3); }
+  .empty-icon { font-size: 48px; opacity: 0.3; }
+  .empty-text { font-family: 'Space Mono', monospace; font-size: 12px; text-align: center; line-height: 1.8; letter-spacing: 1px; }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; padding: 12px 20px; border-radius: 8px;
+    font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700;
+    transform: translateY(80px); opacity: 0; transition: all 0.3s ease; z-index: 100;
+  }
+  .toast.success { background: var(--accent); color: var(--bg); }
+  .toast.error { background: var(--red); color: white; }
+  .toast.show { transform: translateY(0); opacity: 1; }
+
+  .loading-overlay {
+    position: fixed; inset: 0; background: rgba(10,10,15,0.9);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 200; gap: 16px;
+  }
+  .loading-spinner { width: 40px; height: 40px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  .loading-text { font-family: 'Space Mono', monospace; font-size: 12px; color: var(--text3); letter-spacing: 2px; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="loading-spinner"></div>
+  <div class="loading-text">LOADING FROM GOOGLE SHEETS...</div>
+</div>
+
+<div class="header">
+  <div class="header-left">
+    <h1>Trading Journal</h1>
+    <p>MES / SPY · Lucid Eval 25K</p>
+  </div>
+  <div class="header-right">
+    <div class="sync-status">
+      <div class="sync-dot" id="syncDot"></div>
+      <span id="syncText">Connecting...</span>
+    </div>
+    <div class="header-stats">
+      <div class="stat-item">
+        <div class="stat-label">Eval Balance</div>
+        <div class="stat-value neutral" id="evalBalance">$25,000.00</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">To Target</div>
+        <div class="stat-value neutral" id="toTarget">$1,250.00</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Month P&L</div>
+        <div class="stat-value neutral" id="monthPnl">$0.00</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-label">Win Rate</div>
+        <div class="stat-value neutral" id="winRate">--%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="calendar-section">
+    <div class="month-summary">
+      <div class="summary-card">
+        <div class="summary-card-label">Total Trades</div>
+        <div class="summary-card-value" id="totalTrades" style="color:var(--text)">0</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-label">Win Days</div>
+        <div class="summary-card-value" style="color:var(--green)" id="totalWins">0</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-label">Loss Days</div>
+        <div class="summary-card-value" style="color:var(--red)" id="totalLosses">0</div>
+      </div>
+      <div class="summary-card">
+        <div class="summary-card-label">Avg Compliance</div>
+        <div class="summary-card-value" style="color:var(--accent2)" id="avgCompliance">--</div>
+      </div>
+    </div>
+
+    <div class="calendar-nav">
+      <button class="nav-btn" onclick="changeMonth(-1)">&#8592;</button>
+      <h2 id="monthTitle">MARCH 2026</h2>
+      <button class="nav-btn" onclick="changeMonth(1)">&#8594;</button>
+    </div>
+
+    <div class="calendar-grid" id="calendarGrid"></div>
+  </div>
+
+  <div class="panel-section">
+    <div class="panel-header">
+      <div class="panel-date" id="panelDate">SELECT A DATE</div>
+      <div class="panel-subtitle" id="panelSubtitle">Click any day to log or view trades</div>
+    </div>
+    <div class="panel-body" id="panelBody">
+      <div class="empty-state">
+        <div class="empty-icon">📅</div>
+        <div class="empty-text">CLICK A DATE<br>TO LOG YOUR TRADE</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyuQT-Nrrnec2gBvliA0_QUDSPl9-5nt8qjh4XXek3TJG9B1JROroiLMV2LCd_mcFI/exec';
+  const EVAL_START = 25000;
+  const EVAL_TARGET = 26250;
+
+  let currentDate = new Date(2026, 2, 1);
+  let selectedDate = null;
+  let trades = {};
+  let currentRating = 0;
+  let isSaving = false;
+
+  const MONTHS = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+  const DAYS = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+
+  const CHECKLIST_ITEMS = [
+    { id: 'orb',         label: 'ORB Breakout' },
+    { id: 'cvd',         label: 'CVD Confirmed' },
+    { id: 'nodivergence',label: 'No Divergence' },
+    { id: 'candle',      label: '5min Close' },
+    { id: 'choch',       label: 'CHoCH Retest' },
+    { id: 'vwap',        label: 'VWAP Above' },
+    { id: 'norevenge',   label: 'No Revenge' },
+    { id: 'nopowerhour', label: 'No Power Hour' },
+  ];
+
+  // ── SHEETS API via JSONP ──
+  function callAPI(params) {
+    return new Promise((resolve, reject) => {
+      const cbName = 'cb_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+      const url = SCRIPT_URL + '?' + new URLSearchParams({ ...params, callback: cbName });
+      let done = false;
+
+      window[cbName] = (data) => {
+        done = true;
+        delete window[cbName];
+        if (script.parentNode) script.parentNode.removeChild(script);
+        if (data && data.error) reject(new Error(data.error));
+        else resolve(data);
+      };
+
+      const script = document.createElement('script');
+      script.src = url;
+      script.onerror = () => { done = true; delete window[cbName]; reject(new Error('Network error')); };
+      document.head.appendChild(script);
+
+      setTimeout(() => {
+        if (!done) { done = true; delete window[cbName]; reject(new Error('Timeout')); }
+      }, 20000);
+    });
+  }
+
+  function setSyncStatus(status, text) {
+    document.getElementById('syncDot').className = 'sync-dot ' + status;
+    document.getElementById('syncText').textContent = text;
+  }
+
+  async function loadTrades() {
+    try {
+      setSyncStatus('syncing', 'Loading...');
+      const result = await callAPI({ action: 'getTrades' });
+      trades = result.trades || {};
+      setSyncStatus('synced', 'Synced ✓');
+    } catch (err) {
+      setSyncStatus('error', 'Offline mode');
+      showToast('Could not reach Google Sheets', 'error');
+    }
+    document.getElementById('loadingOverlay').style.display = 'none';
+    renderCalendar();
+  }
+
+  async function saveTrade(key) {
+    if (isSaving) return;
+    isSaving = true;
+    const btn = document.querySelector('.save-btn');
+    btn.disabled = true;
+    btn.textContent = 'SAVING TO SHEETS...';
+
+    const checkedItems = Array.from(document.querySelectorAll('#checklist .check-item.checked'))
+      .map(el => { const lbl = el.querySelector('.check-label').textContent; const it = CHECKLIST_ITEMS.find(i => i.label === lbl); return it ? it.id : null; })
+      .filter(Boolean);
+
+    const { y, m, d } = selectedDate;
+    const dateStr = `${MONTHS[m].slice(0,3)} ${d}, ${y}`;
+
+    const tradeData = {
+      dateKey: key, date: dateStr,
+      instrument: document.getElementById('f_instrument').value,
+      pnl: document.getElementById('f_pnl').value,
+      numTrades: document.getElementById('f_numTrades').value,
+      entryTime: document.getElementById('f_entryTime').value,
+      entryPrice: document.getElementById('f_entryPrice').value,
+      exitPrice: document.getElementById('f_exitPrice').value,
+      setup: document.getElementById('f_setup').value,
+      marketContext: document.getElementById('f_marketContext').value,
+      checklist: checkedItems,
+      wellDone: document.getElementById('f_wellDone').value,
+      improve: document.getElementById('f_improve').value,
+      mindset: document.getElementById('f_mindset').value,
+      compliance: currentRating
+    };
+
+    trades[key] = tradeData;
+    renderCalendar();
+
+    try {
+      setSyncStatus('syncing', 'Saving...');
+      await callAPI({ action: 'saveTrade', data: JSON.stringify(tradeData) });
+      setSyncStatus('synced', 'Saved ✓');
+      showToast('SAVED TO GOOGLE SHEETS ✓', 'success');
+    } catch (err) {
+      setSyncStatus('error', 'Save failed');
+      showToast('Save failed — check connection', 'error');
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'SAVE TRADE LOG';
+    isSaving = false;
+  }
+
+  // ── CALENDAR ──
+  function getDateKey(y, m, d) { return `${y}-${m}-${d}`; }
+
+  function renderCalendar() {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    document.getElementById('monthTitle').textContent = `${MONTHS[month]} ${year}`;
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today = new Date();
+
+    let html = DAYS.map(d => `<div class="day-header">${d}</div>`).join('');
+    for (let i = 0; i < firstDay; i++) html += `<div class="day-cell empty"></div>`;
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const key = getDateKey(year, month, d);
+      const trade = trades[key];
+      const isToday = today.getFullYear() === year && today.getMonth() === month && today.getDate() === d;
+      const isSelected = selectedDate && selectedDate.y === year && selectedDate.m === month && selectedDate.d === d;
+
+      let classes = 'day-cell';
+      if (isToday) classes += ' today';
+      if (isSelected) classes += ' selected';
+
+      let inner = `<div class="day-number">${d}</div>`;
+
+      if (trade) {
+        const pnl = parseFloat(trade.pnl) || 0;
+        classes += ' has-trade';
+        if (pnl > 0) classes += ' win';
+        else if (pnl < 0) classes += ' loss';
+        else classes += ' breakeven';
+
+        const comp = parseInt(trade.compliance) || 0;
+        const compClass = comp >= 8 ? 'compliance-full' : comp >= 5 ? 'compliance-partial' : 'compliance-poor';
+
+        inner += `<div class="day-compliance ${compClass}"></div>`;
+        inner += `<div class="day-pnl ${pnl >= 0 ? 'positive' : 'negative'}">${pnl >= 0 ? '+' : ''}$${Math.abs(pnl).toFixed(2)}</div>`;
+        inner += `<div class="day-trades">${trade.numTrades || 0} trade${trade.numTrades != 1 ? 's' : ''}</div>`;
+      }
+
+      html += `<div class="${classes}" onclick="selectDate(${year},${month},${d})">${inner}</div>`;
+    }
+
+    document.getElementById('calendarGrid').innerHTML = html;
+    updateStats();
+  }
+
+  function updateStats() {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    let monthPnl = 0, wins = 0, losses = 0, totalTrades = 0, compSum = 0, compCount = 0;
+
+    for (let d = 1; d <= 31; d++) {
+      const t = trades[getDateKey(year, month, d)];
+      if (t) {
+        const pnl = parseFloat(t.pnl) || 0;
+        monthPnl += pnl;
+        totalTrades += parseInt(t.numTrades) || 0;
+        if (pnl > 0) wins++; else if (pnl < 0) losses++;
+        if (t.compliance) { compSum += parseInt(t.compliance); compCount++; }
+      }
+    }
+
+    const totalDays = wins + losses;
+    const winRate = totalDays > 0 ? Math.round((wins / totalDays) * 100) : null;
+    const evalBalance = EVAL_START + monthPnl;
+    const toTarget = EVAL_TARGET - evalBalance;
+
+    document.getElementById('monthPnl').textContent = `${monthPnl >= 0 ? '+' : ''}$${monthPnl.toFixed(2)}`;
+    document.getElementById('monthPnl').className = `stat-value ${monthPnl > 0 ? 'positive' : monthPnl < 0 ? 'negative' : 'neutral'}`;
+    document.getElementById('winRate').textContent = winRate !== null ? `${winRate}%` : '--%';
+    document.getElementById('winRate').className = `stat-value ${winRate !== null && winRate >= 50 ? 'positive' : winRate !== null ? 'negative' : 'neutral'}`;
+    document.getElementById('evalBalance').textContent = `$${evalBalance.toFixed(2)}`;
+    document.getElementById('toTarget').textContent = toTarget <= 0 ? 'TARGET HIT 🎯' : `$${toTarget.toFixed(2)}`;
+    document.getElementById('toTarget').className = `stat-value ${toTarget <= 0 ? 'positive' : 'neutral'}`;
+    document.getElementById('totalTrades').textContent = totalTrades;
+    document.getElementById('totalWins').textContent = wins;
+    document.getElementById('totalLosses').textContent = losses;
+    document.getElementById('avgCompliance').textContent = compCount > 0 ? `${Math.round(compSum / compCount)}/10` : '--';
+  }
+
+  function selectDate(y, m, d) {
+    selectedDate = { y, m, d };
+    renderCalendar();
+    const dayName = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date(y, m, d).getDay()];
+    document.getElementById('panelDate').textContent = `${dayName}, ${MONTHS[m]} ${d}, ${y}`;
+    document.getElementById('panelSubtitle').textContent = 'Log your trade for this day';
+    const key = getDateKey(y, m, d);
+    const trade = trades[key] || {};
+    currentRating = parseInt(trade.compliance) || 0;
+    renderForm(key, trade);
+  }
+
+  function renderForm(key, trade) {
+    const checkedItems = Array.isArray(trade.checklist) ? trade.checklist : (trade.checklist ? trade.checklist.split(',') : []);
+    const pct = (currentRating / 10) * 100;
+
+    const checklistHtml = CHECKLIST_ITEMS.map(item => {
+      const isChecked = checkedItems.includes(item.id);
+      return `<div class="check-item ${isChecked ? 'checked' : ''}" onclick="toggleCheck(this)">
+        <div class="check-box">${isChecked ? '✓' : ''}</div>
+        <span class="check-label">${item.label}</span>
+      </div>`;
+    }).join('');
+
+    const ratingHtml = [1,2,3,4,5,6,7,8,9,10].map(n =>
+      `<button class="rating-btn ${currentRating >= n ? 'active' : ''}" onclick="setRating(${n})">${n}</button>`
+    ).join('');
+
+    document.getElementById('panelBody').innerHTML = `
+      <div class="form-section">
+        <div class="form-section-title">📊 Trade Summary</div>
+        <div class="form-row triple">
+          <div class="form-group">
+            <label class="form-label">Instrument</label>
+            <select class="form-select" id="f_instrument">
+              <option ${trade.instrument==='MES'?'selected':''}>MES</option>
+              <option ${trade.instrument==='SPY'?'selected':''}>SPY</option>
+              <option ${trade.instrument==='Both'?'selected':''}>Both</option>
+              <option ${trade.instrument==='None'?'selected':''}>None</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Total P&L ($)</label>
+            <input class="form-input" id="f_pnl" type="number" step="0.01" placeholder="0.00" value="${trade.pnl||''}" oninput="colorPnl(this)">
+          </div>
+          <div class="form-group">
+            <label class="form-label"># of Trades</label>
+            <input class="form-input" id="f_numTrades" type="number" min="0" max="10" placeholder="0" value="${trade.numTrades||''}">
+          </div>
+        </div>
+        <div class="form-row triple">
+          <div class="form-group">
+            <label class="form-label">Entry Time</label>
+            <input class="form-input" id="f_entryTime" type="time" value="${trade.entryTime||''}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Entry Price</label>
+            <input class="form-input" id="f_entryPrice" type="number" step="0.25" placeholder="0.00" value="${trade.entryPrice||''}">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Exit Price</label>
+            <input class="form-input" id="f_exitPrice" type="number" step="0.25" placeholder="0.00" value="${trade.exitPrice||''}">
+          </div>
+        </div>
+        <div class="form-row single">
+          <div class="form-group">
+            <label class="form-label">Setup Type</label>
+            <input class="form-input" id="f_setup" placeholder="e.g. ORB Breakout + CHoCH Retest" value="${trade.setup||''}">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">🌍 Market Context</div>
+        <div class="form-row single">
+          <div class="form-group">
+            <label class="form-label">Market Conditions</label>
+            <textarea class="form-textarea" id="f_marketContext" placeholder="VIX level, bias, overall conditions...">${trade.marketContext||''}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">✅ Entry Checklist</div>
+        <div class="checklist" id="checklist">${checklistHtml}</div>
+        <div class="compliance-bar">
+          <div class="compliance-fill" id="compFill" style="width:${(checkedItems.length/CHECKLIST_ITEMS.length)*100}%"></div>
+        </div>
+        <div class="compliance-text">
+          <span>CHECKLIST SCORE</span>
+          <span class="score" id="checkScore">${checkedItems.length}/${CHECKLIST_ITEMS.length}</span>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">🧠 Trade Review</div>
+        <div class="form-row single">
+          <div class="form-group">
+            <label class="form-label">What I did well</label>
+            <textarea class="form-textarea" id="f_wellDone" placeholder="Patience, followed rules, waited for confirmation...">${trade.wellDone||''}</textarea>
+          </div>
+        </div>
+        <div class="form-row single">
+          <div class="form-group">
+            <label class="form-label">What to improve</label>
+            <textarea class="form-textarea" id="f_improve" placeholder="Entry timing, exits, sizing...">${trade.improve||''}</textarea>
+          </div>
+        </div>
+        <div class="form-row single">
+          <div class="form-group">
+            <label class="form-label">Mindset & Emotions</label>
+            <textarea class="form-textarea" id="f_mindset" placeholder="How did you feel? Calm? Anxious? FOMO?" style="min-height:50px">${trade.mindset||''}</textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <div class="form-section-title">⭐ Rule Compliance (1-10)</div>
+        <div class="rating-group">${ratingHtml}</div>
+        <div class="compliance-bar" style="margin-top:10px">
+          <div class="compliance-fill" id="ratingFill" style="width:${pct}%"></div>
+        </div>
+        <div class="compliance-text">
+          <span>DAILY SCORE</span>
+          <span class="score" id="ratingScore">${currentRating}/10</span>
+        </div>
+      </div>
+
+      <button class="save-btn" onclick="saveTrade('${key}')">SAVE TRADE LOG</button>
+    `;
+
+    colorPnl(document.getElementById('f_pnl'));
+  }
+
+  function toggleCheck(el) {
+    el.classList.toggle('checked');
+    el.querySelector('.check-box').textContent = el.classList.contains('checked') ? '✓' : '';
+    const checked = document.querySelectorAll('#checklist .check-item.checked').length;
+    document.getElementById('compFill').style.width = (checked / CHECKLIST_ITEMS.length * 100) + '%';
+    document.getElementById('checkScore').textContent = `${checked}/${CHECKLIST_ITEMS.length}`;
+  }
+
+  function setRating(n) {
+    currentRating = n;
+    document.querySelectorAll('.rating-btn').forEach((b, i) => b.classList.toggle('active', i < n));
+    document.getElementById('ratingFill').style.width = (n / 10 * 100) + '%';
+    document.getElementById('ratingScore').textContent = `${n}/10`;
+  }
+
+  function colorPnl(input) {
+    if (!input) return;
+    const v = parseFloat(input.value);
+    input.style.color = v > 0 ? 'var(--green)' : v < 0 ? 'var(--red)' : 'var(--text)';
+  }
+
+  function changeMonth(dir) {
+    currentDate.setMonth(currentDate.getMonth() + dir);
+    selectedDate = null;
+    document.getElementById('panelDate').textContent = 'SELECT A DATE';
+    document.getElementById('panelSubtitle').textContent = 'Click any day to log or view trades';
+    document.getElementById('panelBody').innerHTML = `<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">CLICK A DATE<br>TO LOG YOUR TRADE</div></div>`;
+    renderCalendar();
+  }
+
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = `toast ${type} show`;
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  loadTrades();
+</script>
+</body>
+</html>
